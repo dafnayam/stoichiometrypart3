@@ -1,0 +1,397 @@
+
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>משחק יחסים בתגובות כימיות - אפיית עוגות</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: Arial, sans-serif;
+        }
+        #game-container {
+            position: relative;
+            width: 845px;
+            height: 498px;
+            background-image: url('https://www.cjoint.com/doc/24_08/NHvijNNCGaB_claude-2-.png');
+            background-size: cover;
+            background-position: center;
+        }
+        .card {
+            background-color: rgba(224, 224, 224, 0.9); /* הפחתת השקיפות של הרקע */
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            position: absolute;
+            user-select: none;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            transition: box-shadow 0.3s ease;
+        }
+        .card:hover {
+            box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+        }
+        #recipe-card {
+            top: 10px;
+            left: 8px;
+            width: 380px;
+            height: auto;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        #data-card {
+            top: 290px;
+            left: 100px;
+        }
+        #answer-card {
+            top: 35px;
+            left: 550px;
+        }
+        #score-card {
+            top: 10px;
+            right: 10px;
+            background-color: rgba(255, 255, 255, 0.9); /* הפחתת השקיפות של הרקע */
+            padding: 10px;
+            border-radius: 5px;
+        }
+        input[type="number"] {
+            width: 60px;
+            padding: 5px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        #feedback {
+            position: absolute;
+            top: 373px;
+            left: 690px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 18px;
+            background-color: rgba(255, 255, 255, 0.9); /* הפחתת השקיפות של הרקע */
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 300px;
+            text-align: center;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+            position: absolute;
+            top: 20%; /* שינוי ל-45% במקום 50% */
+            left: 55%; /* שינוי ל-55% במקום 50% */
+            transform: translate(-50%, -50%);
+        }
+        .modal-button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 14px 20px;
+            margin: 8px 0;
+            border: none;
+            cursor: pointer;
+            width: 100%;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        .modal-button:hover {
+            opacity: 0.8;
+        }
+        @media screen and (max-width: 600px) {
+            #game-container {
+                width: 100%;
+                height: auto;
+                background-size: contain;
+                background-repeat: no-repeat;
+            }
+            .card {
+                position: relative;
+                margin: 10px auto;
+                left: 0;
+                top: 0;
+                width: 80%;
+            }
+            #score-card {
+                position: fixed;
+                top: 10px;
+                right: 10px;
+            }
+            #feedback {
+                position: relative;
+                margin: 10px auto;
+                left: 0;
+                top: 0;
+            }
+        }
+        .card h2, .card p {
+            font-weight: bold; /* הוספת הדגשה לטקסט */
+        }
+    </style>
+</head>
+<body>
+<div id="levelCompleteModal" class="modal">
+    <div class="modal-content">
+        <h2>כל הכבוד!</h2>
+        <p>הגעת ל-10 נקודות!</p>
+        <button class="modal-button" onclick="goToGenially()">מעבר לשלב הבא</button>
+        <button class="modal-button" onclick="restartGame()">משחק חוזר</button>
+    </div>
+</div>
+<div id="game-container">
+    <div id="recipe-card" class="card">
+        <h2>מתכונים</h2>
+        <p id="recipe1"></p>
+        <p id="recipe2"></p>
+    </div>
+    <div id="data-card" class="card">
+        <h2>שאלה</h2>
+        <p id="question"></p>
+        <input type="number" id="answer" step="0.1">
+        <span id="answer-unit"></span>
+        <button onclick="checkAnswer()">בדוק תשובה</button>
+    </div>
+    <div id="feedback"></div>
+    <div id="score-card" class="card">
+        <p>ניקוד: <span id="score">0</span></p>
+    </div>
+</div>
+
+<script>
+    const recipeSets = [
+        {
+            recipe1: { ingredients: { 'כוסות סוכר': 1, 'כפות קקאו': 1 }, product: { "תערובת שוקו": 1 } },
+            recipe2: { ingredients: { "תערובת שוקו": 1, 'שמנת': 0.5 }, product: { "כוסות שוקו חגיגי": 2 } }
+        },
+        {
+            recipe1: { ingredients: { "כדורי גלידה": 3, דובדבן: 4 }, product: { "מנת גלידה": 1 } },
+            recipe2: { ingredients: { "מנות גלידה": 10, 'מיכלי שמנת': 2, 'שקיות סוכריות': 1 }, product: { "חבילות גלידה": 10 } }
+        },
+        {
+            recipe1: { ingredients: { 'כוסות קמח': 2, 'כוסות סוכר': 1, 'כוסות שמן': 0.5 }, product: { "בצק עוגיות": 1 } },
+            recipe2: { ingredients: { "בצק עוגיות": 1, 'חבילות שוקולד': 2 }, product: { "עוגיות שוקולד צ'יפס": 20 } }
+        },
+        {
+            recipe1: { ingredients: { 'כוסות חלב': 2, 'כפות קקאו': 1, 'כוסות סוכר': 1 }, product: { "תערובת שוקו": 1 } },
+            recipe2: { ingredients: { "תערובת שוקו": 1, קצפת: 0.5 }, product: { "כוסות שוקו חגיגי": 2 } }
+        }
+    ];
+
+    let currentRecipeSet;
+    let correctAnswer;
+    let score = 0;
+    let previousRecipeIndex = -1;
+    let questionCount = 0; // סופרת את מספר השאלות שנשאלו
+
+    function startGame() {
+        selectNewRecipeSet();
+        displayRecipes();
+        generateQuestion();
+        document.getElementById('feedback').style.display = 'none';
+        document.getElementById('levelCompleteModal').style.display = 'none';
+        score = 0;
+        questionCount = 0;
+        document.getElementById('score').innerText = score;
+        document.getElementById('answer').value = '';
+    }
+
+    function selectNewRecipeSet() {
+        let newRecipeIndex;
+        if (questionCount % 9 === 2 || questionCount % 9 === 8) {
+            // וודא שמתכון העוגיות מופיע פעמיים כל 9 שאלות
+            newRecipeIndex = 2; // המדד של מתכון העוגיות 
+        } else {
+            do {
+                newRecipeIndex = Math.floor(Math.random() * (recipeSets.length - 1));
+            } while (newRecipeIndex === previousRecipeIndex);
+        }
+        previousRecipeIndex = newRecipeIndex;
+        currentRecipeSet = recipeSets[newRecipeIndex];
+    }
+
+    function displayRecipes() {
+        document.getElementById('recipe1').innerText = formatRecipe(currentRecipeSet.recipe1);
+        document.getElementById('recipe2').innerText = formatRecipe(currentRecipeSet.recipe2);
+    }
+
+    function formatRecipe(recipe) {
+        let ingredients = Object.entries(recipe.ingredients)
+            .map(([name, amount]) => `${amount} ${name}`)
+            .join(' + ');
+        let products = Object.entries(recipe.product)
+            .map(([name, amount]) => `${amount} ${name}`)
+            .join(', ');
+        return `${ingredients} = ${products}`;
+    }
+
+    function generateQuestion() {
+        if (currentRecipeSet.recipe1.ingredients.hasOwnProperty("כדורי גלידה")) {
+            // שימוש בפונקציה מיוחדת למתכון הגלידה
+            generateIceCreamQuestion();
+        } else {
+            if (Math.random() < 0.5) {
+                generateTypeAQuestion();
+            } else {
+                generateTypeBQuestion();
+            }
+        }
+        questionCount++; // עדכן את מספר השאלות שנשאלו
+    }
+
+    function generateIceCreamQuestion() {
+        if (Math.random() < 0.5) {
+            // שאלה מסוג A למתכון הגלידה
+            const amountA = getRandomInt(5, 250);
+            const ingredientA = "כדורי גלידה";
+            const productF = "חבילות גלידה";
+            const a = 3;  // מקדם של כדורי גלידה במתכון 1
+            const b = 1;  // מקדם של מנת גלידה במתכון 1
+            const d = 10; // מקדם של מנת גלידה במתכון 2
+            const f = 10; // מקדם של חבילות גלידה במתכון 2
+
+            correctAnswer = (amountA * b * f) / (a * d);
+            correctAnswer = Number(correctAnswer.toFixed(2));
+
+            document.getElementById('question').innerText = `אם השתמשנו ב-${amountA} ${ingredientA}, כמה ${productF} נקבל בסוף התהליך?`;
+            document.getElementById('answer-unit').innerText = productF;
+        } else {
+            // שאלה מסוג B למתכון הגלידה
+            const amountF = getRandomInt(5, 250);
+            const ingredientA = "כדורי גלידה";
+            const productF = "חבילות גלידה";
+            const a = 3;  // מקדם של כדורי גלידה במתכון 1
+            const b = 1;  // מקדם של מנת גלידה במתכון 1
+            const d = 10; // מקדם של מנת גלידה במתכון 2
+            const f = 10; // מקדם של חבילות גלידה במתכון 2
+
+            correctAnswer = (amountF * a * d) / (b * f);
+            correctAnswer = Number(correctAnswer.toFixed(2));
+
+            document.getElementById('question').innerText = `אם קיבלנו ${amountF} ${productF}, בכמה ${ingredientA} השתמשנו בהתחלה?`;
+            document.getElementById('answer-unit').innerText = ingredientA;
+        }
+    }
+
+    function generateTypeAQuestion() {
+        const ingredientsKeys = Object.keys(currentRecipeSet.recipe1.ingredients);
+        const ingredientA = ingredientsKeys[Math.floor(Math.random() * ingredientsKeys.length)];
+        const productB = Object.keys(currentRecipeSet.recipe1.product)[0];
+        const productF = Object.keys(currentRecipeSet.recipe2.product)[0];
+        const amountA = getRandomInt(5, 250);
+
+        const a = currentRecipeSet.recipe1.ingredients[ingredientA];
+        const b = currentRecipeSet.recipe1.product[productB];
+        const d = currentRecipeSet.recipe2.ingredients[productB];
+        const f = currentRecipeSet.recipe2.product[productF];
+
+        correctAnswer = (amountA * b * f) / (a * d);
+        correctAnswer = Number(correctAnswer.toFixed(2));
+
+        document.getElementById('question').innerText = `אם השתמשנו ב-${amountA} ${ingredientA}, כמה ${productF} נקבל בסוף התהליך?`;
+        document.getElementById('answer-unit').innerText = productF;
+    }
+
+    function generateTypeBQuestion() {
+        const ingredientsKeys = Object.keys(currentRecipeSet.recipe1.ingredients);
+        const ingredientA = ingredientsKeys[Math.floor(Math.random() * ingredientsKeys.length)];
+        const productB = Object.keys(currentRecipeSet.recipe1.product)[0];
+        const productF = Object.keys(currentRecipeSet.recipe2.product)[0];
+        const amountF = getRandomInt(5, 250);
+
+        const a = currentRecipeSet.recipe1.ingredients[ingredientA];
+        const b = currentRecipeSet.recipe1.product[productB];
+        const d = currentRecipeSet.recipe2.ingredients[productB];
+        const f = currentRecipeSet.recipe2.product[productF];
+
+        correctAnswer = (amountF * d * a) / (b * f);
+        correctAnswer = Number(correctAnswer.toFixed(2));
+
+        document.getElementById('question').innerText = `אם קיבלנו ${amountF} ${productF}, בכמה ${ingredientA} השתמשנו בהתחלה?`;
+        document.getElementById('answer-unit').innerText = ingredientA;
+    }
+
+    function getRandomKey(obj) {
+        const keys = Object.keys(obj);
+        return keys[Math.floor(Math.random() * keys.length)];
+    }
+
+    function getRandomInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function checkAnswer() {
+        const userAnswer = parseFloat(document.getElementById('answer').value);
+        const tolerance = 0.1;
+        const feedbackElement = document.getElementById('feedback');
+        feedbackElement.style.display = 'block';
+
+        if (!isNaN(userAnswer) && Math.abs(userAnswer - correctAnswer) <= tolerance) {
+            score++;
+            feedbackElement.innerText = 'כל הכבוד! תשובה נכונה!';
+            document.getElementById('score').innerText = score;
+
+            if (score >= 10) {
+                setTimeout(() => {
+                    document.getElementById('levelCompleteModal').style.display = 'block';
+                }, 1500);
+            } else {
+                setTimeout(() => {
+                    feedbackElement.style.display = 'none';
+                    document.getElementById('answer').value = '';
+                    selectNewRecipeSet();
+                    displayRecipes();
+                    generateQuestion();
+                }, 1500);
+            }
+        } else {
+            score = Math.max(0, score - 1);
+            feedbackElement.innerText = `טעות. התשובה הנכונה היא ${correctAnswer}.`;
+            document.getElementById('score').innerText = score;
+            setTimeout(() => {
+                feedbackElement.style.display = 'none';
+                document.getElementById('answer').value = '';
+                selectNewRecipeSet();
+                displayRecipes();
+                generateQuestion();
+            }, 1500);
+        }
+    }
+
+    function goToGenially() {
+        window.location.href = 'https://view.genially.com/66943af9697166f0f83e7bab';
+    }
+
+    function restartGame() {
+        startGame();
+    }
+
+    startGame();
+</script>
+</body>
+</html>
